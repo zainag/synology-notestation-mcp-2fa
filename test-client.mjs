@@ -9,15 +9,16 @@ import { dirname, join } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const serverPath = join(__dirname, "dist", "index.js");
 
-const env = {
-  SYNO_HOST: "192.168.50.69",
-  SYNO_PORT: "4071",
-  SYNO_HTTPS: "true",
-  SYNO_IGNORE_CERT: "true",
-  SYNO_USERNAME: "ygt1005",
-  SYNO_PASSWORD: "jiwon0530!",
-  ...process.env,
-};
+// Connection settings come exclusively from the environment — nothing is
+// hardcoded here. Required: SYNO_HOST, SYNO_USERNAME, SYNO_PASSWORD.
+// Optional (server-side defaults in src/index.ts): SYNO_PORT=5001,
+// SYNO_HTTPS=true, SYNO_IGNORE_CERT=false.
+//
+// Example:
+//   SYNO_HOST=192.0.2.10 SYNO_HTTPS=true SYNO_IGNORE_CERT=true \
+//     SYNO_USERNAME=<dsm-user> SYNO_PASSWORD=*** \
+//     node test-client.mjs
+const env = process.env;
 
 const proc = spawn("node", [serverPath], {
   env,
@@ -102,7 +103,7 @@ async function main() {
     const noteContent = `# Synology NoteStation MCP Server 분석 결과
 
 ## 구현 완료된 항목
-- MCP 서버 프로젝트: C:\\\\Users\\\\LGSPO\\\\synology-notestation-mcp
+- MCP 서버 프로젝트: ~/projects/synology-notestation-mcp
 - TypeScript 기반 MCP SDK (@modelcontextprotocol/sdk) 사용
 - DSM API 클라이언트: 인증(session), API 호출, raw API 지원
 - NoteStation 래퍼: 노트북/노트/태그 CRUD
@@ -123,7 +124,7 @@ async function main() {
 
 ## 설정 파일
 - opencode.json에 notestation MCP 서버 등록 완료
-- NAS 연결 정보: 192.168.50.69:4071 (HTTPS)
+- NAS 연결 정보: 환경변수 SYNO_HOST/SYNO_PORT 참고 (hardcoded 값 없음)
 
 ## 주요 이슈
 - NoteStation의 create/update/delete API는 공식 문서화되지 않음
