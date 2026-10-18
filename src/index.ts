@@ -12,9 +12,12 @@
  *   SYNO_HTTPS       - Use HTTPS (default: true)
  *   SYNO_IGNORE_CERT - Ignore self-signed cert errors (default: false)
  *   SYNO_USERNAME    - DSM username (required)
- *   SYNO_PASSWORD    - DSM password (required)
+ *   SYNO_PASSWORD    - DSM password (required; or OS credential store, service
+ *                      "synology-dsm" — see "Credential store" in the README)
  *   SYNO_OTP_CODE    - static OTP code for 2FA (optional, fragile)
- *   SYNO_OTP_SECRET  - base32 TOTP secret; current code computed at login (preferred)
+ *   SYNO_OTP_SECRET  - base32 TOTP secret; current code computed at login
+ *                      (preferred; or OS credential store, service
+ *                      "synology-dsm-otp")
  *   SYNO_OTP_FILE    - path to a file containing the current 6-digit code
  */
 
@@ -31,13 +34,47 @@ import { NoteStationApi } from "./notestation.js";
 
 // ── Configuration ──────────────────────────────────────────────────────────
 
-function getConfig(): DsmConfig {
+/**
+ * Resolve a secret: config file value first (the default — MCP clients pass
+ * the environment block from e.g. opencode.json to the server process), then
+ * the OS credential store via the optional `keytar` package (Windows
+ * Credential Manager / macOS Keychain / Linux Secret Service). Returns
+ * undefined when neither has a value.
+ */
+async function resolveSecret(
+  envName: string,
+  keytarService: string,
+  username: string
+): Promise<string | undefined> {
+  const fromConfig = process.env[envName];
+  if (fromConfig) return fromConfig;
+  try {
+    const keytar = (await import("keytar")).default as {
+      getPassword: (service: string, account: string) => Promise<string | null>;
+    };
+    const fromStore = await keytar.getPassword(keytarService, username);
+    if (fromStore) return fromStore;
+  } catch {
+    // keytar not installed, or the store is unreadable — fall through
+  }
+  return undefined;
+}
+
+async function getConfig(): Promise<DsmConfig> {
   const host = process.env.SYNO_HOST;
   if (!host) throw new Error("SYNO_HOST environment variable is required");
   const username = process.env.SYNO_USERNAME;
   if (!username) throw new Error("SYNO_USERNAME environment variable is required");
-  const password = process.env.SYNO_PASSWORD;
-  if (!password) throw new Error("SYNO_PASSWORD environment variable is required");
+
+  const password = await resolveSecret("SYNO_PASSWORD", "synology-dsm", username);
+  if (!password) {
+    throw new Error(
+      "DSM password is required. Put SYNO_PASSWORD in the MCP server " +
+        `configuration, or store it in the OS credential store: npx keytar set synology-dsm ${username} <password>`
+    );
+  }
+
+  const otpSecret = await resolveSecret("SYNO_OTP_SECRET", "synology-dsm-otp", username);
 
   return {
     host,
@@ -46,7 +83,7 @@ function getConfig(): DsmConfig {
     account: username,
     password: password,
     otpCode: process.env.SYNO_OTP_CODE || undefined,
-    otpSecret: process.env.SYNO_OTP_SECRET || undefined,
+    otpSecret: otpSecret,
     otpFile: process.env.SYNO_OTP_FILE || undefined,
     ignoreCert: process.env.SYNO_IGNORE_CERT === "true",
   };
@@ -69,7 +106,7 @@ const server = new Server(
 let nsApi: NoteStationApi;
 
 async function initClient(): Promise<void> {
-  const config = getConfig();
+  const config = await getConfig();
   const client = new DsmApiClient(config);
   await client.login();
   nsApi = new NoteStationApi(client);
@@ -508,7 +545,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       error.message?.includes("119")    // permission denied
     ) {
       try {
-        const config = getConfig();
+        const config = await getConfig();
         const client = new DsmApiClient(config);
         await client.login();
         nsApi = new NoteStationApi(client);

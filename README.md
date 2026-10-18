@@ -170,13 +170,35 @@ plaintext DSM password and TOTP secret — keep it out of version control.
 | `SYNO_HTTPS` | Use HTTPS | `true` |
 | `SYNO_IGNORE_CERT` | Ignore self-signed cert errors | `false` |
 | `SYNO_USERNAME` | DSM account (**required**) | — |
-| `SYNO_PASSWORD` | DSM password (**required**) | — |
-| `SYNO_OTP_SECRET` | Base32 TOTP secret — current 2FA code computed locally at login (primary 2FA pathway) | — |
+| `SYNO_PASSWORD` | DSM password (**required**, or OS credential store — see below) | — |
+| `SYNO_OTP_SECRET` | Base32 TOTP secret — current 2FA code computed locally at login (primary 2FA pathway; or OS credential store — see below) | — |
 | `SYNO_OTP_FILE` | Path to a file containing the current 6-digit code (2FA fallback) | — |
 | `SYNO_OTP_CODE` | Static 2FA code (fragile fallback — a code expires after 30 s) | — |
 
 2FA is only attempted when DSM actually challenges the login (error 403);
 on accounts without 2FA no OTP env var is needed.
+
+### OS credential store (optional — no plaintext in the config file)
+
+If you'd rather not keep the password or TOTP secret in your config file,
+store them in the OS credential store (Windows Credential Manager, macOS
+Keychain, or Linux Secret Service) and omit `SYNO_PASSWORD` /
+`SYNO_OTP_SECRET` from the config. When a config value is absent, the server
+reads the credential store via the optional `keytar` dependency (account =
+your `SYNO_USERNAME`).
+
+One-time storage (run from the repo folder; `keytar` is installed by
+`npm install`):
+
+```
+node -e "require('keytar').setPassword('synology-dsm','<username>','<password>')"
+node -e "require('keytar').setPassword('synology-dsm-otp','<username>','<base32-secret>')"
+```
+
+Service names: `synology-dsm` (password), `synology-dsm-otp` (TOTP secret).
+Remove with `deletePassword` the same way. Config values take precedence
+when both are set. On Windows the store is DPAPI-encrypted (tied to your
+login session) and is not inherited by or visible to other processes.
 
 ## Build & run
 
