@@ -188,8 +188,40 @@ export class DsmApiClient {
    * Login to DSM and get session ID. Handles the 2FA challenge flow:
    * first attempt may return code 403 with an OTP challenge; retry with
    * the code plus the challenge token/ticket.
+   *
+   * Also handles DSM's TOTP anti-replay: a code is consumed by ONE login
+   * per 30 s window. If a previous login already used this window's code
+   * (e.g. the MCP server was restarted within the same window), DSM
+   * answers the OTP retry with a bare 404 — wait for the next window and
+   * retry once with a fresh code.
    */
   async login(): Promise<string> {
+    for (let attempt = 0; ; attempt++) {
+      const data = await this.loginAttempt();
+
+      if (data.success) {
+        this.sid = data.data.sid;
+        this.synoToken = data.data.synotoken || null;
+        return this.sid!;
+      }
+
+      if (attempt === 0 && data.error?.code === 404) {
+        // Wait out the current TOTP window (+1 s margin), then retry with
+        // a freshly computed code.
+        const waitMs = 30_000 - (Date.now() % 30_000) + 1_000;
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+
+      throw new Error(`DSM API error: ${JSON.stringify(data)}`);
+    }
+  }
+
+  /**
+   * One full login pass: initial auth call + 2FA retry if challenged.
+   * Returns the raw (final) response without throwing on API errors.
+   */
+  private async loginAttempt(): Promise<any> {
     const params: Record<string, string> = {
       api: "SYNO.API.Auth",
       version: "7",
@@ -227,12 +259,7 @@ export class DsmApiClient {
       data = await this.postFormRaw("/auth.cgi", params);
     }
 
-    if (!data.success) {
-      throw new Error(`DSM API error: ${JSON.stringify(data)}`);
-    }
-    this.sid = data.data.sid;
-    this.synoToken = data.data.synotoken || null;
-    return this.sid!;
+    return data;
   }
 
   /**
