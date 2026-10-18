@@ -133,6 +133,7 @@ from, one time:
 | Error 103 is ambiguous | Returned for unknown method *and* unknown param — even a fake method name (`zzz_not_real`) returns 103, so it can't distinguish the two. |
 | Error 114 | No permission (e.g. malformed tags). |
 | Error 403 | 2FA challenge (handled in login flow). |
+| TOTP code is single-use per window | DSM consumes a 6-digit code after ONE login; a second login in the same 30 s window (e.g. MCP server restart) gets a bare **404** on the OTP retry (after ~6 s). Login handles this: on a 404 it waits for the next 30 s window and retries with a fresh code. |
 | Error 1033 w/ `synodrive:1008` | Transient `delete` failure — retry works (seen repeatedly; retry logic is fine). |
 | `SYNO.API.Info` | `query=all` works but returns no `methods`; `methodquery` variants → 103. API discovery via `query=all` + filter on `SYNO.NoteStation.*` is the reliable path. |
 | Versions | Client uses `maxVersion` from discovery (Note = v4); the UI uses v3 for `delete`, but v4 also honors `recycle`. |
