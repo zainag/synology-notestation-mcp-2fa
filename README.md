@@ -33,8 +33,13 @@ no manual code entry, ever. You only need to tell it where to get the code
 from, one time:
 
 1. **Prerequisite**: 2FA must be enabled on your DSM account
-   (DSM → Control Panel → Security → 2FA). If you don't use 2FA, skip this
-   section entirely — no OTP env var is needed and the server works as-is.
+   (DSM → Control Panel → Security → 2FA), and the second sign-in step must
+   include **Verification code (OTP)** — the 6-digit-code method. This
+   server logs in by computing that code itself, so the code method is
+   required: an account that only uses "Approve sign-in" (push via the
+   Synology Secure SignIn app) or a hardware key cannot be logged into via
+   the API. If you don't use 2FA, skip this section entirely — no OTP env
+   var is needed and the server works as-is.
 2. **Get your base32 TOTP secret** (`SYNO_OTP_SECRET`): this is the secret
    behind the 6-digit codes your authenticator app generates for DSM.
    In order of preference:
