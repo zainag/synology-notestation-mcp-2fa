@@ -195,6 +195,13 @@ node -e "require('keytar').setPassword('synology-dsm','<username>','<password>')
 node -e "require('keytar').setPassword('synology-dsm-otp','<username>','<base32-secret>')"
 ```
 
+Read them back (keytar calls are async — the `.then` waits for and prints
+the resolved value; without it you'd just see a pending Promise):
+
+```
+node -e "require('keytar').getPassword('synology-dsm','<username>').then(console.log)"
+```
+
 Service names: `synology-dsm` (password), `synology-dsm-otp` (TOTP secret).
 Remove with `deletePassword` the same way. Config values take precedence
 when both are set. On Windows the store is DPAPI-encrypted (tied to your
