@@ -149,6 +149,13 @@ export class NoteStationApi {
     if (title !== undefined) params.title = title;
     if (content !== undefined) params.content = this.markdownToHtml(content);
     if (tags !== undefined) params.tag = JSON.stringify(tags);
+    // DSM's `set` re-derives the note title from the new content when no title
+    // is sent. Preserve the existing title so a content-only update cannot
+    // rename the note to its first heading.
+    if (content !== undefined && title === undefined) {
+      const current = await this.getNote(noteId);
+      if (current?.title) params.title = current.title;
+    }
     // DSM's NoteStation API uses "set" (not "update") — "update" returns 103.
     return this.client.callNoteStationPost("SYNO.NoteStation.Note", "set", params);
   }

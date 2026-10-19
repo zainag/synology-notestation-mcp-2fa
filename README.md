@@ -21,9 +21,13 @@ enabled (admin account).
    `SYNO_OTP_CODE`. Restart = automatic login, no manual steps.
 2. **Update uses method `set`, not `update`** (`src/notestation.ts`) —
    upstream's `update` fails with DSM error 103.
-3. **`rawApiCall` param-clobber fix** (`src/dsm-api.ts`) — extra params no
+3. **Title preserved on content-only updates** (`src/notestation.ts`) — DSM's
+   `set` re-derives the note title from the new content when no title is sent
+   in the same call. `update_note` now fetches the current title and re-sends
+   it, so updating content alone can't rename the note to its first heading.
+4. **`rawApiCall` param-clobber fix** (`src/dsm-api.ts`) — extra params no
    longer overwrite `api`/`version`/`method`/`_sid`.
-4. **Safe delete + restore** (`src/notestation.ts`, `src/index.ts`) — see
+5. **Safe delete + restore** (`src/notestation.ts`, `src/index.ts`) — see
    "Delete safety" below.
 
 ## Setting up 2FA in your environment
@@ -130,6 +134,7 @@ from, one time:
 | `set` silently ignores unknown params | A "success" response does **not** mean the field changed — always re-verify via `list`/`get` (e.g. `set recycle=true` is ignored). |
 | Tags must be a JSON-array string | `tags: ["a","b"]` works; comma-separated → error 114 (no permission). |
 | `update` method doesn't exist | Use `set`. |
+| `set` re-derives title from content | Sending `content` without `title` renames the note to its first heading. `update_note` now re-sends the current title on content-only updates to prevent this. |
 | Error 103 is ambiguous | Returned for unknown method *and* unknown param — even a fake method name (`zzz_not_real`) returns 103, so it can't distinguish the two. |
 | Error 114 | No permission (e.g. malformed tags). |
 | Error 403 | 2FA challenge (handled in login flow). |
@@ -229,7 +234,7 @@ method `set`).
 | `list_notes` | List notes, pagination; includes bin notes (`recycle: true`) |
 | `get_note` | Full note content |
 | `create_note` | Create note (`notebook_id` → `parent_id`) |
-| `update_note` | Update via method `set` |
+| `update_note` | Update via method `set`; existing title is preserved on content-only updates |
 | `delete_note` | **Bin by default**; `permanent: true` hard-deletes |
 | `restore_note` | Restore a bin note to its original notebook |
 | `list_tags` / `list_todos` / `list_smart_notes` | Reads |

@@ -198,7 +198,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           title: {
             type: "string",
-            description: "New title (optional)",
+            description:
+              "New title (optional). If content is updated without a title, the note's existing title is preserved automatically — DSM re-derives the title from new content otherwise.",
           },
           content: {
             type: "string",
