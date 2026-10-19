@@ -127,7 +127,7 @@ from, one time:
   silently. Note: renaming a bin note via `set` fails (1049) — leave bin-note
   titles as-is.
 
-## DSM API quirks (observed, verified 2026-10-17)
+## DSM API quirks (observed, verified 2026-10-17, updated 2026-10-19)
 
 | Quirk | Detail |
 |---|---|
@@ -135,14 +135,17 @@ from, one time:
 | Tags must be a JSON-array string | `tags: ["a","b"]` works; comma-separated → error 114 (no permission). |
 | `update` method doesn't exist | Use `set`. |
 | `set` re-derives title from content | Sending `content` without `title` renames the note to its first heading. `update_note` now re-sends the current title on content-only updates to prevent this. |
+| UI autosave re-derives the title (unfixable from the MCP side) | Merely opening a note in the DSM web UI can fire an editor save that (a) re-serializes the HTML (entities → literal chars, attribute/whitespace normalization) and (b) saves content without a title → title re-derived from the first heading. The MCP guard doesn't cover UI-originated saves. **Mitigation convention: make the note's first heading identical to its title** (or start the body with a paragraph) so any titleless save is a no-op. Verified 2026-10-19 (create 09:38 → UI save 09:40 clobbered the title). |
 | Error 103 is ambiguous | Returned for unknown method *and* unknown param — even a fake method name (`zzz_not_real`) returns 103, so it can't distinguish the two. |
 | Error 114 | No permission (e.g. malformed tags). |
 | Error 403 | 2FA challenge (handled in login flow). |
 | TOTP code is single-use per window | DSM consumes a 6-digit code after ONE login; a second login in the same 30 s window (e.g. MCP server restart) gets a bare **404** on the OTP retry (after ~6 s). Login handles this: on a 404 it waits for the next 30 s window and retries with a fresh code. |
 | Error 1033 w/ `synodrive:1008` | Transient `delete` failure — retry works (seen repeatedly; retry logic is fine). |
-| `SYNO.API.Info` | `query=all` works but returns no `methods`; `methodquery` variants → 103. API discovery via `query=all` + filter on `SYNO.NoteStation.*` is the reliable path. |
+| `SYNO.API.Info` | The method is **`query`**, not `get` (`get` → 103). `query=all` works but returns no `methods` (only name/version/path); `methodquery` variants → 103. API discovery via `query=all` + filter on `SYNO.NoteStation.*` is the reliable path — it's the NAS's live self-describing registry (verified 2026-10-19: 1,159 APIs, 36 NoteStation, no attachment namespace). |
 | Versions | Client uses `maxVersion` from discovery (Note = v4); the UI uses v3 for `delete`, but v4 also honors `recycle`. |
 | Note id | `object_id` (`1034_...`); create takes `notebook_id` (maps to `parent_id`). Create is occasionally flaky — `raw_api_call` as fallback. |
+| Rich content: HTML is the full-capability path | `markdownToHtml` covers headings, bold/italic, inline code, images, links, lists, code blocks, `<hr>` — but **no markdown tables**. Content containing HTML tags passes through unconverted, so write tables (and any rich markup: `<table>`, `<blockquote>`, `<mark>`, styled attributes) directly in HTML. Remote `<img src>` URLs are stored and **render in the UI** (verified 2026-10-19). |
+| Attachments are UI-only; no native charts | No attachment API exists — probed `SYNO.NoteStation.NoteAttachment` / `.Attachment` / `.File` (all error 102) **and confirmed against the full live API registry** (36 NoteStation namespaces, none attachment-related), verified 2026-10-19. Attachments can only be added in the web UI. Charts: embed a chart image. |
 
 ## When the API is ambiguous: read the UI's JS bundle
 
